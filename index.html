@@ -1,0 +1,56 @@
+function printReceipt(tx) {
+      const lineLen = 42;
+
+      function padLine(left, right) {
+        const spaces = lineLen - (left.length + right.length);
+        return left + ' '.repeat(Math.max(1, spaces)) + right;
+      }
+
+      function centerText(text) {
+        const spaces = Math.max(0, Math.floor((lineLen - text.length) / 2));
+        return ' '.repeat(spaces) + text;
+      }
+
+      let text = "";
+      text += centerText("TOKO MORODADI JAYA") + "\n";
+      text += centerText("MOJOKERTO") + "\n";
+      text += "-".repeat(lineLen) + "\n";
+      text += padLine(tx.date + " " + tx.time, "Cashier: Owner") + "\n";
+      text += "No: " + tx.invoice + "\n";
+      text += "-".repeat(lineLen) + "\n";
+
+      let totalQty = 0;
+      tx.items.forEach(it => {
+        totalQty += it.qty;
+        text += it.name + "\n";
+        const subtotalStr = Number(it.qty * it.activePrice).toLocaleString('id-ID');
+        const calcStr = "  " + it.qty + " x " + Number(it.activePrice).toLocaleString('id-ID');
+        text += padLine(calcStr, subtotalStr) + "\n";
+      });
+
+      text += "-".repeat(lineLen) + "\n";
+      text += padLine("Total QTY : " + totalQty, "") + "\n";
+      text += padLine("Total", "Rp " + Number(tx.totalSales).toLocaleString('id-ID')) + "\n";
+      text += padLine("Pay (Cash)", "Rp " + Number(tx.totalSales).toLocaleString('id-ID')) + "\n";
+      text += "-".repeat(lineLen) + "\n";
+      text += centerText("Barang yang sudah dibeli tidak dapat") + "\n";
+      text += centerText("dikembalikan / ditukar") + "\n\n";
+      text += centerText("Untuk Pemesanan Hubungi :") + "\n";
+      text += centerText("0851-7206-3110") + "\n\n";
+
+      // Baris feed kertas agar teks tidak terpotong pisau
+      text += "\n\n\n";
+
+      // Perintah byte standar ESC/POS: GS V 66 0 (Cut paper)
+      const cutCommand = "\x1D\x56\x42\x00";
+      text += cutCommand;
+
+      const utf8Bytes = new TextEncoder().encode(text);
+      let binaryStr = "";
+      for (let i = 0; i < utf8Bytes.length; i++) {
+        binaryStr += String.fromCharCode(utf8Bytes[i]);
+      }
+      const b64 = btoa(binaryStr);
+
+      window.location.href = "rawbt:base64," + b64;
+    }
