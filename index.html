@@ -1,56 +1,390 @@
-function printReceipt(tx) {
-      const lineLen = 42;
-
-      function padLine(left, right) {
-        const spaces = lineLen - (left.length + right.length);
-        return left + ' '.repeat(Math.max(1, spaces)) + right;
-      }
-
-      function centerText(text) {
-        const spaces = Math.max(0, Math.floor((lineLen - text.length) / 2));
-        return ' '.repeat(spaces) + text;
-      }
-
-      let text = "";
-      text += centerText("TOKO MORODADI JAYA") + "\n";
-      text += centerText("MOJOKERTO") + "\n";
-      text += "-".repeat(lineLen) + "\n";
-      text += padLine(tx.date + " " + tx.time, "Cashier: Owner") + "\n";
-      text += "No: " + tx.invoice + "\n";
-      text += "-".repeat(lineLen) + "\n";
-
-      let totalQty = 0;
-      tx.items.forEach(it => {
-        totalQty += it.qty;
-        text += it.name + "\n";
-        const subtotalStr = Number(it.qty * it.activePrice).toLocaleString('id-ID');
-        const calcStr = "  " + it.qty + " x " + Number(it.activePrice).toLocaleString('id-ID');
-        text += padLine(calcStr, subtotalStr) + "\n";
-      });
-
-      text += "-".repeat(lineLen) + "\n";
-      text += padLine("Total QTY : " + totalQty, "") + "\n";
-      text += padLine("Total", "Rp " + Number(tx.totalSales).toLocaleString('id-ID')) + "\n";
-      text += padLine("Pay (Cash)", "Rp " + Number(tx.totalSales).toLocaleString('id-ID')) + "\n";
-      text += "-".repeat(lineLen) + "\n";
-      text += centerText("Barang yang sudah dibeli tidak dapat") + "\n";
-      text += centerText("dikembalikan / ditukar") + "\n\n";
-      text += centerText("Untuk Pemesanan Hubungi :") + "\n";
-      text += centerText("0851-7206-3110") + "\n\n";
-
-      // Baris feed kertas agar teks tidak terpotong pisau
-      text += "\n\n\n";
-
-      // Perintah byte standar ESC/POS: GS V 66 0 (Cut paper)
-      const cutCommand = "\x1D\x56\x42\x00";
-      text += cutCommand;
-
-      const utf8Bytes = new TextEncoder().encode(text);
-      let binaryStr = "";
-      for (let i = 0; i < utf8Bytes.length; i++) {
-        binaryStr += String.fromCharCode(utf8Bytes[i]);
-      }
-      const b64 = btoa(binaryStr);
-
-      window.location.href = "rawbt:base64," + b64;
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kasir Toko Morodadi Jaya</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary: #00aa6c;
+      --primary-dark: #008755;
+      --primary-light: #e6f7f0;
+      --bg: #f8faf9;
+      --card-bg: #ffffff;
+      --text-main: #2d3748;
+      --text-muted: #718096;
+      --border: #e2e8f0;
+      --danger: #e53e3e;
+      --warning: #f6ad55;
     }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      background: #fff;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 1.05rem;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .badge-btn {
+      background: var(--warning);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    nav.bottom-bar {
+      display: flex;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      z-index: 20;
+    }
+
+    nav.bottom-bar button {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+    }
+
+    nav.bottom-bar button.active {
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    nav.bottom-bar button svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    .page {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px 80px 14px;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: 25px;
+      font-size: 0.88rem;
+      outline: none;
+      background: #fff;
+    }
+
+    .category-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      white-space: nowrap;
+    }
+
+    .pill {
+      background: #edf2f7;
+      color: var(--text-main);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      border: none;
+    }
+
+    .pill.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .item-card {
+      background: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .item-avatar {
+      width: 38px;
+      height: 38px;
+      background: #edf2f7;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-weight: bold;
+      font-size: 0.85rem;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+
+    .item-info {
+      flex: 1;
+    }
+
+    .item-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .item-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .item-right {
+      text-align: right;
+    }
+
+    .item-price {
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .item-stock {
+      font-size: 0.75rem;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .sticky-cart-btn {
+      position: fixed;
+      bottom: 66px;
+      left: 14px;
+      right: 14px;
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0, 170, 108, 0.4);
+      cursor: pointer;
+      z-index: 15;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      width: 100%;
+      max-width: 380px;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .qty-picker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin: 18px 0;
+    }
+
+    .qty-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--border);
+      font-size: 1.3rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .qty-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .modal-row {
+      margin-bottom: 12px;
+    }
+
+    .modal-row label {
+      font-size: 0.82rem;
+      display: block;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 0.88rem;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: #edf2f7; color: var(--text-main); }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    .summary-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 0.88rem;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .summary-net {
+      background: var(--primary-light);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      margin-top: 12px;
+    }
+
+    .summary-net h2 {
+      color: var(--primary-dark);
+      font-size: 1.3rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Morodadi Jaya</h1>
+    <div class="top-actions">
+      <button class="badge-btn" onclick="openHoldOrders()">
+        🍳 <span id="hold-count">0</span>
+      </button>
+      <button onclick="document.getElementById('excel-file-input').click()" style="background:none; border:none; cursor:pointer;" title="Muat Excel">
+        📁
+      </button>
+      <input type="file" id="excel-file-input" accept=".xls,.xlsx" style="display:none;" onchange="handleExcelImport(event)">
+    </div>
+  </header>
+
+  <!-- Tab 1: Kasir -->
+  <section id="page-sales" class="page active">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Cari nama atau barcode..." oninput="renderProductList()">
+    </div>
+    <div class="category-scroll" id="category-pills">
+      <button class="pill active" onclick="
