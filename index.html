@@ -24,7 +24,6 @@
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      -webkit-tap-highlight-color: transparent;
     }
 
     body {
@@ -272,7 +271,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 20px;
+      gap: 12px;
       margin: 18px 0;
     }
 
@@ -285,13 +284,26 @@
       font-size: 1.3rem;
       font-weight: bold;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .qty-value {
+    .qty-input {
       font-size: 1.5rem;
       font-weight: 700;
-      min-width: 40px;
+      width: 80px;
+      height: 44px;
       text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #f7fafc;
+      outline: none;
+    }
+
+    .qty-input:focus {
+      border-color: var(--primary);
+      background: #fff;
     }
 
     .modal-row {
@@ -299,20 +311,28 @@
     }
 
     .modal-row label {
-      font-size: 0.82rem;
-      display: block;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       color: var(--text-main);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
       font-weight: 500;
+      cursor: pointer;
     }
 
     .modal-input {
       width: 100%;
-      padding: 8px 12px;
+      padding: 10px 12px;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 0.88rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
       outline: none;
+      background: #fff;
+    }
+
+    .modal-input:focus {
+      border-color: var(--primary);
     }
 
     .modal-buttons {
@@ -323,7 +343,7 @@
 
     .btn {
       flex: 1;
-      padding: 10px;
+      padding: 11px;
       border-radius: 8px;
       font-weight: bold;
       font-size: 0.88rem;
@@ -478,35 +498,35 @@
     </button>
   </nav>
 
-  <!-- Modal Edit Item Cart -->
-  <div class="modal-overlay" id="cart-item-modal">
-    <div class="modal-content">
+  <!-- Modal Edit Item Cart (Diperbaiki agar Keyboard Muncul di HP) -->
+  <div class="modal-overlay" id="cart-item-modal" onclick="handleModalBgClick(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
       <h3 id="modal-cart-item-title" style="margin-bottom:4px;">Nama Produk</h3>
       <div id="modal-cart-item-code" style="font-size:0.8rem; color:var(--text-muted);">CODE</div>
 
       <div class="qty-picker">
-        <button class="qty-btn" onclick="adjustModalQty(-1)">-</button>
-        <span class="qty-value" id="modal-cart-qty">1</span>
-        <button class="qty-btn" onclick="adjustModalQty(1)">+</button>
+        <button class="qty-btn" type="button" onclick="adjustModalQty(-1)">-</button>
+        <input type="number" id="modal-cart-qty" class="qty-input" inputmode="numeric" min="1" step="1">
+        <button class="qty-btn" type="button" onclick="adjustModalQty(1)">+</button>
       </div>
 
       <div class="modal-row">
         <label>
           <input type="checkbox" id="modal-chk-price" onchange="toggleModalField('price')"> Ganti harga sementara
         </label>
-        <input type="number" id="modal-input-price" class="modal-input" style="display:none;" placeholder="Harga khusus">
+        <input type="number" id="modal-input-price" class="modal-input" inputmode="numeric" style="display:none;" placeholder="Harga khusus transaksi ini">
       </div>
 
       <div class="modal-row">
         <label>
           <input type="checkbox" id="modal-chk-note" onchange="toggleModalField('note')"> Tambah catatan
         </label>
-        <input type="text" id="modal-input-note" class="modal-input" style="display:none;" placeholder="Catatan barang...">
+        <input type="text" id="modal-input-note" class="modal-input" style="display:none;" placeholder="Ketik catatan di sini...">
       </div>
 
       <div class="modal-buttons">
-        <button class="btn btn-danger" onclick="deleteCurrentCartItem()">HAPUS</button>
-        <button class="btn btn-primary" onclick="saveCartItemAdjustment()">SIMPAN</button>
+        <button class="btn btn-danger" type="button" onclick="deleteCurrentCartItem()">HAPUS</button>
+        <button class="btn btn-primary" type="button" onclick="saveCartItemAdjustment()">SIMPAN</button>
       </div>
     </div>
   </div>
@@ -529,17 +549,17 @@
 
       <div class="modal-row">
         <label>Stok*</label>
-        <input type="number" id="form-prod-stock" class="modal-input" placeholder="0">
+        <input type="number" id="form-prod-stock" class="modal-input" inputmode="numeric" placeholder="0">
       </div>
 
       <div class="modal-row">
         <label>Harga Beli (HPP)*</label>
-        <input type="number" id="form-prod-buy" class="modal-input" placeholder="0">
+        <input type="number" id="form-prod-buy" class="modal-input" inputmode="numeric" placeholder="0">
       </div>
 
       <div class="modal-row">
         <label>Harga Jual*</label>
-        <input type="number" id="form-prod-sell" class="modal-input" placeholder="0">
+        <input type="number" id="form-prod-sell" class="modal-input" inputmode="numeric" placeholder="0">
       </div>
 
       <div class="modal-row">
@@ -573,9 +593,8 @@
       updateHoldBadge();
     };
 
-    // Fungsi Cetak Langsung Teks Resmi RawBT
     function printReceipt(tx) {
-      const lineLen = 42; // Standar aman kolom cetak karakter thermal
+      const lineLen = 42;
 
       function padLine(left, right) {
         const spaces = lineLen - (left.length + right.length);
@@ -612,10 +631,20 @@
       text += centerText("Barang yang sudah dibeli tidak dapat") + "\n";
       text += centerText("dikembalikan / ditukar") + "\n\n";
       text += centerText("Untuk Pemesanan Hubungi :") + "\n";
-      text += centerText("0851-7206-3110") + "\n\n\n\n";
+      text += centerText("0851-7206-3110") + "\n\n";
 
-      // Skema teks resmi RawBT
-      window.location.href = "rawbt:print-text?text=" + encodeURIComponent(text);
+      text += "\n\n\n";
+      const cutCommand = "\x1D\x56\x42\x00";
+      text += cutCommand;
+
+      const utf8Bytes = new TextEncoder().encode(text);
+      let binaryStr = "";
+      for (let i = 0; i < utf8Bytes.length; i++) {
+        binaryStr += String.fromCharCode(utf8Bytes[i]);
+      }
+      const b64 = btoa(binaryStr);
+
+      window.location.href = "rawbt:base64," + b64;
     }
 
     function switchTab(tabId) {
@@ -657,7 +686,12 @@
           sellPrice: Number(r.harga_jual_edit || r.price || r.Harga || 0),
           stock: Number(r.stok_edit || r.stok || r.Stock || 0),
           category: String(r.kategori || 'Umum').trim()
-        })).filter(p => p.name !== '');
+        })).filter(p => {
+          const isInstruction = p.name.includes("Data dapat diubah") || 
+                                p.name.includes("Abaikan kolom ini") ||
+                                p.code.includes("Data Kolom ini");
+          return p.name !== '' && !isInstruction;
+        });
 
         localStorage.setItem('products_db', JSON.stringify(products));
         alert('Berhasil mengimpor ' + products.length + ' barang!');
@@ -898,12 +932,13 @@
       renderCart();
     }
 
+    // Modal Edit Item Cart
     function openCartItemModal(index) {
       selectedCartIndex = index;
       const item = currentCart[index];
       document.getElementById('modal-cart-item-title').innerText = item.name;
       document.getElementById('modal-cart-item-code').innerText = item.code || '-';
-      document.getElementById('modal-cart-qty').innerText = item.qty;
+      document.getElementById('modal-cart-qty').value = item.qty;
 
       const chkPrice = document.getElementById('modal-chk-price');
       const inputPrice = document.getElementById('modal-input-price');
@@ -920,26 +955,43 @@
       document.getElementById('cart-item-modal').classList.add('active');
     }
 
+    function handleModalBgClick(e) {
+      if (e.target.id === 'cart-item-modal') {
+        document.getElementById('cart-item-modal').classList.remove('active');
+      }
+    }
+
     function toggleModalField(type) {
       if (type === 'price') {
         const chk = document.getElementById('modal-chk-price');
-        document.getElementById('modal-input-price').style.display = chk.checked ? 'block' : 'none';
+        const input = document.getElementById('modal-input-price');
+        input.style.display = chk.checked ? 'block' : 'none';
+        if (chk.checked) {
+          setTimeout(() => input.focus(), 100);
+        }
       } else {
         const chk = document.getElementById('modal-chk-note');
-        document.getElementById('modal-input-note').style.display = chk.checked ? 'block' : 'none';
+        const input = document.getElementById('modal-input-note');
+        input.style.display = chk.checked ? 'block' : 'none';
+        if (chk.checked) {
+          setTimeout(() => input.focus(), 100);
+        }
       }
     }
 
     function adjustModalQty(delta) {
-      let q = parseInt(document.getElementById('modal-cart-qty').innerText) + delta;
+      const input = document.getElementById('modal-cart-qty');
+      let q = parseInt(input.value) || 1;
+      q += delta;
       if (q < 1) q = 1;
-      document.getElementById('modal-cart-qty').innerText = q;
+      input.value = q;
     }
 
     function saveCartItemAdjustment() {
       if (selectedCartIndex === null) return;
       const item = currentCart[selectedCartIndex];
-      item.qty = parseInt(document.getElementById('modal-cart-qty').innerText);
+      const parsedQty = parseInt(document.getElementById('modal-cart-qty').value);
+      item.qty = (isNaN(parsedQty) || parsedQty < 1) ? 1 : parsedQty;
 
       if (document.getElementById('modal-chk-price').checked) {
         item.activePrice = Number(document.getElementById('modal-input-price').value) || item.sellPrice;
