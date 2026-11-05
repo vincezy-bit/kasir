@@ -173,6 +173,12 @@
       justify-content: space-between;
       align-items: center;
       cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .item-card:active {
+      background: #f7fafc;
     }
 
     .item-avatar {
@@ -206,6 +212,9 @@
     }
 
     .item-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       text-align: right;
     }
 
@@ -214,10 +223,24 @@
       font-weight: 700;
     }
 
-    .item-stock {
-      font-size: 0.75rem;
-      color: var(--primary);
-      font-weight: 600;
+    .item-count-badge {
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 6px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      animation: popIn 0.15s ease-out;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.6); }
+      100% { transform: scale(1); }
     }
 
     .sticky-cart-btn {
@@ -498,7 +521,7 @@
     </button>
   </nav>
 
-  <!-- Modal Edit Item Cart (Diperbaiki agar Keyboard Muncul di HP) -->
+  <!-- Modal Edit Item Cart -->
   <div class="modal-overlay" id="cart-item-modal" onclick="handleModalBgClick(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
       <h3 id="modal-cart-item-title" style="margin-bottom:4px;">Nama Produk</h3>
@@ -531,7 +554,7 @@
     </div>
   </div>
 
-  <!-- Modal Tambah / Edit Produk -->
+  <!-- Modal Tambah / Edit Produk (Tanpa Stok) -->
   <div class="modal-overlay" id="product-form-modal">
     <div class="modal-content">
       <h3 id="product-modal-title" style="margin-bottom:14px;">Tambah Produk</h3>
@@ -545,11 +568,6 @@
       <div class="modal-row">
         <label>Kode / Barcode*</label>
         <input type="text" id="form-prod-code" class="modal-input" placeholder="Contoh: LAIN0003">
-      </div>
-
-      <div class="modal-row">
-        <label>Stok*</label>
-        <input type="number" id="form-prod-stock" class="modal-input" inputmode="numeric" placeholder="0">
       </div>
 
       <div class="modal-row">
@@ -684,7 +702,6 @@
           name: String(r.nama_barang_edit || r.name || r.Nama || '').trim(),
           buyPrice: Number(r.harga_beli_edit || r.harga_dasar || r.HPP || 0),
           sellPrice: Number(r.harga_jual_edit || r.price || r.Harga || 0),
-          stock: Number(r.stok_edit || r.stok || r.Stock || 0),
           category: String(r.kategori || 'Umum').trim()
         })).filter(p => {
           const isInstruction = p.name.includes("Data dapat diubah") || 
@@ -717,8 +734,10 @@
       renderProductList();
     }
 
+    // Render Tab Kasir dengan Badge Jumlah Terpilih & Keyboard Anti-Close
     function renderProductList() {
-      const query = document.getElementById('search-input').value.toLowerCase();
+      const searchInput = document.getElementById('search-input');
+      const query = (searchInput ? searchInput.value : '').toLowerCase();
       const listEl = document.getElementById('product-list');
       listEl.innerHTML = '';
 
@@ -736,7 +755,24 @@
       filtered.forEach(p => {
         const div = document.createElement('div');
         div.className = 'item-card';
-        div.onclick = () => addToCart(p);
+
+        // Hitung berapa item ini sudah ada di keranjang
+        const cartItem = currentCart.find(i => i.code === p.code && i.name === p.name);
+        const countInCart = cartItem ? cartItem.qty : 0;
+
+        // Cegah keyboard HP tertutup saat kartu ditekan (prevent blur)
+        div.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+        });
+
+        div.onclick = () => {
+          addToCart(p);
+          // Tetap pertahankan kursor di kolom pencarian agar keyboard tetap terbuka
+          if (searchInput) {
+            searchInput.focus();
+          }
+        };
+
         div.innerHTML = `
           <div style="display:flex; align-items:center;">
             <div class="item-avatar">${p.name.substring(0,2).toUpperCase()}</div>
@@ -747,7 +783,7 @@
           </div>
           <div class="item-right">
             <div class="item-price">${formatRp(p.sellPrice)}</div>
-            ${p.stock !== undefined ? `<div class="item-stock">${p.stock} pcs</div>` : ''}
+            ${countInCart > 0 ? `<div class="item-count-badge">${countInCart}</div>` : ''}
           </div>
         `;
         listEl.appendChild(div);
@@ -781,8 +817,7 @@
           </div>
           <div style="text-align:right;">
             <div class="item-price" style="color:var(--primary);">${formatRp(p.sellPrice)}</div>
-            <div class="item-sub">Stok: <b>${p.stock}</b></div>
-            <button onclick="deleteProduct(${originalIndex})" style="border:none; background:none; color:var(--danger); font-size:0.8rem; margin-top:4px; cursor:pointer;">Hapus</button>
+            <button onclick="deleteProduct(${originalIndex})" style="border:none; background:none; color:var(--danger); font-size:0.8rem; margin-top:6px; cursor:pointer;">Hapus</button>
           </div>
         `;
         container.appendChild(div);
@@ -800,7 +835,6 @@
         const p = products[index];
         document.getElementById('form-prod-name').value = p.name;
         document.getElementById('form-prod-code').value = p.code;
-        document.getElementById('form-prod-stock').value = p.stock;
         document.getElementById('form-prod-buy').value = p.buyPrice;
         document.getElementById('form-prod-sell').value = p.sellPrice;
         document.getElementById('form-prod-category').value = p.category || 'Umum';
@@ -809,7 +843,6 @@
         idxInput.value = '';
         document.getElementById('form-prod-name').value = '';
         document.getElementById('form-prod-code').value = '';
-        document.getElementById('form-prod-stock').value = '0';
         document.getElementById('form-prod-buy').value = '';
         document.getElementById('form-prod-sell').value = '';
         document.getElementById('form-prod-category').value = '';
@@ -824,7 +857,6 @@
     function saveProductForm() {
       const name = document.getElementById('form-prod-name').value.trim();
       const code = document.getElementById('form-prod-code').value.trim();
-      const stock = Number(document.getElementById('form-prod-stock').value) || 0;
       const buyPrice = Number(document.getElementById('form-prod-buy').value) || 0;
       const sellPrice = Number(document.getElementById('form-prod-sell').value) || 0;
       const category = document.getElementById('form-prod-category').value.trim() || 'Umum';
@@ -832,7 +864,7 @@
       if (!name) return alert('Nama barang wajib diisi!');
 
       const editIndex = document.getElementById('edit-prod-index').value;
-      const itemData = { code, name, stock, buyPrice, sellPrice, category };
+      const itemData = { code, name, buyPrice, sellPrice, category };
 
       if (editIndex !== '') {
         products[Number(editIndex)] = itemData;
@@ -873,6 +905,7 @@
         });
       }
       saveCart();
+      renderProductList(); // Memperbarui badge angka di daftar barang
     }
 
     function saveCart() {
@@ -930,9 +963,9 @@
       currentCart.splice(index, 1);
       saveCart();
       renderCart();
+      renderProductList();
     }
 
-    // Modal Edit Item Cart
     function openCartItemModal(index) {
       selectedCartIndex = index;
       const item = currentCart[index];
@@ -1008,6 +1041,7 @@
       document.getElementById('cart-item-modal').classList.remove('active');
       saveCart();
       renderCart();
+      renderProductList();
     }
 
     function deleteCurrentCartItem() {
@@ -1033,6 +1067,7 @@
       currentCart = [];
       saveCart();
       renderCart();
+      renderProductList();
       updateHoldBadge();
       switchTab('sales');
     }
@@ -1054,6 +1089,7 @@
         localStorage.setItem('hold_orders', JSON.stringify(holdOrders));
         saveCart();
         updateHoldBadge();
+        renderProductList();
         switchTab('cart');
       }
     }
@@ -1077,14 +1113,6 @@
         netProfit: total - hppTotal
       };
 
-      currentCart.forEach(ci => {
-        const prod = products.find(p => p.code === ci.code && p.name === ci.name);
-        if (prod && prod.stock !== undefined) {
-          prod.stock -= ci.qty;
-        }
-      });
-      localStorage.setItem('products_db', JSON.stringify(products));
-
       transactions.unshift(newTx);
       localStorage.setItem('transactions_db', JSON.stringify(transactions));
 
@@ -1093,6 +1121,7 @@
       currentCart = [];
       saveCart();
       renderCart();
+      renderProductList();
       switchTab('transactions');
     }
 
@@ -1151,18 +1180,12 @@
       const idx = transactions.findIndex(t => t.invoice === inv);
       if (idx !== -1) {
         const tx = transactions[idx];
-        tx.items.forEach(ci => {
-          const prod = products.find(p => p.code === ci.code && p.name === ci.name);
-          if (prod && prod.stock !== undefined) {
-            prod.stock += ci.qty;
-          }
-        });
         currentCart = [...tx.items];
         transactions.splice(idx, 1);
         localStorage.setItem('transactions_db', JSON.stringify(transactions));
-        localStorage.setItem('products_db', JSON.stringify(products));
         saveCart();
         renderCart();
+        renderProductList();
         switchTab('cart');
       }
     }
